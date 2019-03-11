@@ -132,7 +132,8 @@ int main(void) {
         handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
         if (handle == NULL) {
                 printf("장치를 열 수 없습니다.\n");
-                return 0;
+                printf("error message: %s", errbuf);
+		return 0;
         }
         if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
                 printf("필터를 적용할 수 없습니다.\n");
