@@ -2,7 +2,8 @@
 #include <pcap.h> // PCAP 라이브러리 가져오기
 #include <arpa/inet.h> // inet_ntoa 등 함수 포함
 #include <netinet/in.h> // in_addr 등 구조체 포함
-
+#include <pthread.h>
+#pragma pack (1)
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -13,7 +14,12 @@ bpf_u_int32 net; // 아이피 주소
 struct pcap_pkthdr *header; // 패킷 관련 정보
 const u_char *packet; // 실제 패킷
 struct in_addr addr; // 주소 정보
-
+u_int32_t gate_ip;
+u_int32_t dst_ip;
+u_int32_t my_ip;
+unsigned char dst_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
+unsigned char my_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
+unsigned char gate_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
 #define ETHER_ADDR_LEN 6
 
 struct sniff_ethernet {
