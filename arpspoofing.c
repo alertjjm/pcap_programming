@@ -1,3 +1,4 @@
+#include<libnet.h>
 #include <stdio.h>
 #include <pcap.h> // PCAP 라이브러리 가져오기
 #include <arpa/inet.h> // inet_ntoa 등 함수 포함
@@ -19,6 +20,7 @@ u_int32_t dst_ip;
 u_int32_t my_ip;
 unsigned char dst_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
 unsigned char my_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
+struct libnet_ether_addr *mmac;
 unsigned char gate_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
 #define ETHER_ADDR_LEN 6
 
@@ -121,16 +123,31 @@ void parsing() {
 }
 
 int main(void) {
+	libnet_t* l;
 	char device[10];
-	char targetip[30];
-	char hostip[30];
+	unsigned char mip[4];
+	unsigned char targetip[4];
+	unsigned char hostip[4];
 	printf("interface: ");
 	scanf("%s", device);
 	printf("target ip: ");
 	scanf("%s", targetip);
 	printf("hostip: ");
 	scanf("%s", hostip);
+	if(l=libnet_init(LIBNET_LINK, device,errbuf)==NULL){
+		printf("libnet init error\n");
+		return 0;
+	}
+	mmac=libnet_get_hwaddr(l);
+	memcpy(my_mac,mmac,6);
+	printf("1\n");
+	my_ip=libnet_get_ipaddr4(l);
+	memcpy(mip,(char*)&my_ip,4);
+	printf("2\n");
+	printf("my ip=%d.%d.%d.%d\nmy mac=%02x:%02x:%02x:%02x:%02x:%02x\n",mip[0],mip[1],mip[2],mip[3],my_mac[0],my_mac[1],my_mac[2],my_mac[3],my_mac[4],my_mac[5]);
 
+	
+	
 	return 0;
 	
 	
