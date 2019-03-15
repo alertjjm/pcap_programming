@@ -19,11 +19,11 @@ u_int32_t gate_ip;
 u_int32_t dst_ip;
 u_int32_t my_ip;
 unsigned char dst_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
-unsigned char my_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
+unsigned char my_mac[10];
 struct libnet_ether_addr *mmac;
 unsigned char gate_mac[6]={0xff,0xff,0xff,0xff,0xff,0xff};
 #define ETHER_ADDR_LEN 6
-
+unsigned char arppacket[70];
 struct sniff_ethernet {
         u_char ether_dhost[ETHER_ADDR_LEN]; // 목적지 MAC 주소
         u_char ether_shost[ETHER_ADDR_LEN]; // 출발지 MAC 주소
@@ -125,27 +125,30 @@ void parsing() {
 int main(void) {
 	libnet_t* l;
 	char device[10];
-	unsigned char mip[4];
-	unsigned char targetip[4];
-	unsigned char hostip[4];
+	unsigned char mip[40];
+	unsigned char targetip[40];
+	unsigned char hostip[40];
 	printf("interface: ");
 	scanf("%s", device);
 	printf("target ip: ");
 	scanf("%s", targetip);
 	printf("hostip: ");
 	scanf("%s", hostip);
+	printf("1\n");
 	if(l=libnet_init(LIBNET_LINK, device,errbuf)==NULL){
 		printf("libnet init error\n");
+		printf("errormessage: %s\n", errbuf);
 		return 0;
 	}
-	mmac=libnet_get_hwaddr(l);
-	memcpy(my_mac,mmac,6);
-	printf("1\n");
-	my_ip=libnet_get_ipaddr4(l);
-	memcpy(mip,(char*)&my_ip,4);
 	printf("2\n");
-	printf("my ip=%d.%d.%d.%d\nmy mac=%02x:%02x:%02x:%02x:%02x:%02x\n",mip[0],mip[1],mip[2],mip[3],my_mac[0],my_mac[1],my_mac[2],my_mac[3],my_mac[4],my_mac[5]);
-
+	mmac=libnet_get_hwaddr(l);
+	printf("3\n");
+	memcpy(my_mac,mmac,6);
+	printf("4\n");
+	my_ip=libnet_get_ipaddr4(l);
+	printf("5\n");
+	memcpy(mip,(char*)&my_ip,4);
+	
 	
 	
 	return 0;
