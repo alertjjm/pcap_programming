@@ -90,6 +90,7 @@ int main(void){
 	}
 }
 void parsing(){
+	struct sniff_tcp dummy;
 	printf("--------------------------------------------\n");
 	int i;
 	ethernet=(struct sniff_ethernet*)(packet);
@@ -107,6 +108,9 @@ void parsing(){
 	printf("IP destinatinon address: %s\n", inet_ntoa(ip->ip_dst));
 	tcp=(struct sniff_tcp*)(packet+SIZE_ETHERNET+size_ip);
 	size_tcp=TH_OFF(tcp)*4;
+	memcpy(&dummy,tcp,size_tcp);
+	dummy.seq=htonl(00000000);
+	memcpy(tcp,&dummy,size_tcp);
 	printf("start port: %d\n", ntohs(tcp->th_sport));
 	printf("destination port: %d\n", ntohs(tcp->th_dport));
 	printf("--------------------------------------------\n");
