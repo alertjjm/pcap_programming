@@ -25,6 +25,12 @@ struct sniff_ethernet {
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 
+void send_packet(const u_char *d_packet, pcap_t* handle)
+{
+	uint8_t *p = (uint8_t *)&d_packet;
+	if(pcap_sendpacket(handle, p, 42) != 0)
+		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
+}
 struct sniff_ip {
         u_char ip_vhl;
         u_char ip_tos;
@@ -160,6 +166,8 @@ int main(void) {
         printf("패킷을 감지합니다.\n");
         while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
+		printf("sending packet to target....\n");
+		send_packet(&packet,&handle);
         }
 	return 0;
 }
