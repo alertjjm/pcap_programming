@@ -13,7 +13,7 @@ bpf_u_int32 net; // 아이피 주소
 struct pcap_pkthdr *header; // 패킷 관련 정보
 const u_char *packet; // 실제 패킷
 struct in_addr addr; // 주소 정보
-
+u_int32_t target_ip;
 #define ETHER_ADDR_LEN 6
 
 struct sniff_ethernet {
@@ -76,9 +76,11 @@ struct sniff_tcp *dummy_tcp;
 struct sniff_ip *dummy_ip;
 u_int size_ip;
 u_int size_tcp;
-
+int first=1;
 void parsing() {
-        printf("------------------------------------------------------\n");
+        tcp_seq dummy_seq;
+	
+	printf("------------------------------------------------------\n");
         int i, payload_len;
         ethernet = (struct sniff_ethernet*)(packet);
         printf("MAC 출발지 주소 :");
@@ -94,14 +96,20 @@ void parsing() {
                 printf("%02x ", ethernet->ether_dhost[i]);
         }
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        size_ip = IP_HL(ip)*4;
+        memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip));
+	size_ip = IP_HL(ip)*4;
         printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
         printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
         tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-        size_tcp = TH_OFF(tcp)*4;
+        if(first==1)
+		dummy_seq=tcp->th_seq;
+
+	memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));
+	size_tcp = TH_OFF(tcp)*4;
         printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
         printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
-        payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+        printf("seq: %d\n", ntohs(tcp->th_seq));
+	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         if(payload_len == 0) printf("페이로드 데이터가 없습니다.");
         else {
@@ -113,10 +121,15 @@ void parsing() {
                 }
         }
         printf("\n------------------------------------------------------\n");
+	first++;	
 }
 
 int main(void) {
-       dev = pcap_lookupdev(errbuf);
+	char temp[50];
+	printf("target ip address: ");
+	scanf("%s", temp);
+	target_ip=inet_addr(temp);
+	dev = pcap_lookupdev(errbuf);
         if (dev == NULL) {
                 printf("네트워크 장치를 찾을 수 없습니다.\n");
                 return 0;
