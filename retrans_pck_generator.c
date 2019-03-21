@@ -81,9 +81,10 @@ struct sniff_tcp *dummy_tcp;
 struct sniff_ip *dummy_ip;
 u_int size_ip;
 u_int size_tcp;
-int first=1;
+int first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 변수
+tcp_seq dummy_seq;
+
 void parsing() {
-        tcp_seq dummy_seq;
 	
 	printf("------------------------------------------------------\n");
         int i, payload_len;
@@ -101,15 +102,15 @@ void parsing() {
                 printf("%02x ", ethernet->ether_dhost[i]);
         }
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip));
+        memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip)); //정종민: 패킷의 목적지 ip를 타겟의 ip로 변경
 	size_ip = IP_HL(ip)*4;
         printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
         printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
         tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-        if(first==1)
-		dummy_seq=tcp->th_seq;
-
-	memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));
+        //
+		if(first==1)
+		dummy_seq=tcp->th_seq;//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
+	memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));//이후에 오는 모든 패킷에는 저장해놨던 dummy_seq내용 덮어쓰기
 	size_tcp = TH_OFF(tcp)*4;
         printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
         printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
@@ -126,7 +127,7 @@ void parsing() {
                 }
         }
         printf("\n------------------------------------------------------\n");
-	first++;	
+	first++;	//패킷이 넘어갈때마다 1씩증가
 }
 
 int main(void) {
