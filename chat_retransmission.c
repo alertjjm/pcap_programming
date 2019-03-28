@@ -32,7 +32,7 @@ struct e_i_t_packet {
         u_short ether_type;
         
         uint16_t ip_buf;
-	    uint16_t total_len;
+	uint16_t total_len;
         u_short ip_id;
         u_short ip_off;
         #define IP_RF 0x8000
@@ -81,14 +81,14 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.ether_shost[0]=0x00; // 출발지 MAC 주소
         packet.ether_shost[1]=0x0c;
         packet.ether_shost[2]=0x29;
-        packet.ether_shost[3]=0xb4;
-        packet.ether_shost[4]=0x3e;
-        packet.ether_shost[5]=0x25;
+        packet.ether_shost[3]=0x57;
+        packet.ether_shost[4]=0x1d;
+        packet.ether_shost[5]=0x1c;
 
-        packet.ether_type=ntohs(0x0800);
+        packet.ether_type=htons(0x0800);
         
-        packet.ip_buf=ntohs(0x4500);
-	    packet.total_len=ntohs(0x0028);
+        packet.ip_buf=htons(0x4500);
+	packet.total_len=htons(0x0028);
 
         packet.ip_id=0x0000;
         packet.ip_off=0x0000;
@@ -105,11 +105,7 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.src_ip[2] = my_ipaddr[2];
         packet.src_ip[3] = my_ipaddr[3];
 
-        packet.dst_ip[0] = my_ipaddr[0];
-        packet.dst_ip[1] = my_ipaddr[1];
-        packet.dst_ip[2] = my_ipaddr[2];
-        packet.dst_ip[3] = my_ipaddr[3];  
-
+       
         packet.th_dport=ntohs(0x23e6); // 목적지 TCP 주소
 
         packet.th_seq=0x00000000;
@@ -118,7 +114,7 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         
         packet.th_flags=0x02;
         
-        packet.th_win=ntohs(0x7210);
+        packet.th_win=htons(0x7210);
         packet.th_sum=0x0000;
         packet.th_urp=0x0000;
     
@@ -130,13 +126,18 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
 int main(int argc, char* argv[]) {
 
     struct e_i_t_packet packet;
+    char temp[50];
+    printf("target ip address: ");
+	scanf("%s", temp);
+	target_ip=inet_addr(temp);
 
      uint8_t my_ipaddr[4];
 
+
      my_ipaddr[0]=0xc0;
      my_ipaddr[1]=0xa8;
-     my_ipaddr[2]=0x2c;
-     my_ipaddr[3]=0x8f;
+     my_ipaddr[2]=0x4d;
+     my_ipaddr[3]=0x91;
 
 
 	dev = pcap_lookupdev(errbuf);
