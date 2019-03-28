@@ -11,6 +11,12 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 
+void error_handling(char *msg)
+{
+    fputs(msg, stderr);
+    fputc('\n', stderr);
+    exit(1);
+}
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -49,7 +55,8 @@ struct e_i_t_packet {
         u_short th_dport; // 목적지 TCP 주소
         u_int th_seq;
         u_int th_ack;
-        u_char th_offx2;
+	u_int a;
+	u_int th_offx2;
         #define TH_OFF(th) (((th)->th_offx2 & 0xf0) >> 4)
         u_char th_flags;
         #define TH_FIN 0x01
@@ -64,13 +71,14 @@ struct e_i_t_packet {
         u_short th_win;
         u_short th_sum;
         u_short th_urp;
-	u_char* message="hello";
+	u_char message[10];
 };
 
 void send_packet(struct e_i_t_packet packet, pcap_t* handle)
 {
 	uint8_t *p = (uint8_t *)&packet;
-	if(pcap_sendpacket(handle, p, 54) != 0)
+	
+	if(pcap_sendpacket(handle, p, 68) != 0)
 		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
 
@@ -79,25 +87,35 @@ void send_packet(struct e_i_t_packet packet, pcap_t* handle)
 struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipaddr)
 {
 
-        packet.ether_shost[0]=0x00; // 출발지 MAC 주소
+       
+	packet.ether_shost[0]=0x00;
         packet.ether_shost[1]=0x0c;
         packet.ether_shost[2]=0x29;
         packet.ether_shost[3]=0x57;
         packet.ether_shost[4]=0x1d;
         packet.ether_shost[5]=0x1c;
-	
+	packet.ether_dhost[0]=0x00;
+	packet.ether_dhost[1]=0x0c;
+	packet.ether_dhost[2]=0x29;
+	packet.ether_dhost[3]=0xd8;
+	packet.ether_dhost[4]=0x2c;
+	packet.ether_dhost[5]=0x9a;
+
+
+
         packet.ether_type=ntohs(0x0800);
         
-        packet.ip_buf=ntohs(0x4500);
-	packet.total_len=ntohs(0x0098);
+        packet.ip_buf=ntohs(0x4502);
+	packet.total_len=ntohs(0x0034);
 
         packet.ip_id=0x0000;
         packet.ip_off=0x0000;
+
         
         packet.ip_ttl=0x40;
         packet.ip_p=0x06; // IP 프로토콜 유형
         packet.ip_sum=0x0000;
-       
+    
         // 출발지 IP 주소
          // 목적지 IP 주소
 
@@ -108,11 +126,13 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
 	packet.dst_ip[0]=my_ipaddr[0];
 	packet.dst_ip[1]=my_ipaddr[1];
  	packet.dst_ip[2]=my_ipaddr[2];
-	packet.dst_ip[3]=0x92;	
+	packet.dst_ip[3]=0x93;
+	packet.th_sport=ntohs(0x9a9e);	
         packet.th_dport=ntohs(0x23e6); // 목적지 TCP 주소
 
-        packet.th_seq=0x00000000;
-        packet.th_ack=0x00000000;
+        packet.th_seq=htons(0x00000000);
+        packet.th_ack=htons(0x00000000);
+	packet.a=htons(0x20202020);
         packet.th_offx2=0xa0;
         
         packet.th_flags=0x02;
@@ -120,9 +140,18 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.th_win=ntohs(0x7210);
         packet.th_sum=0x0000;
         packet.th_urp=0x0000;
-    	
-        printf("finish make packet...\n\n");
+    	packet.message[0]=0x68;
+	packet.message[1]=0x65;
+	packet.message[2]=0x6c;
+	packet.message[3]=0x6c;
+	packet.message[4]=0x6f;
+	packet.message[5]=0x68;
+        packet.message[6]=0x65;
+        packet.message[7]=0x6c;
+        packet.message[8]=0x6c;
+        packet.message[9]=0x6f;
 
+        printf("finish make packet...\n\n");
         return packet;
 }
 
@@ -156,6 +185,26 @@ int main(int argc, char* argv[]) {
         }
 
 
+int sock;
+    struct sockaddr_in serv_addr;
+    if(argc!=3)
+    {
+        printf("Usage : %s <IP> <port> \n", argv[0]);
+        exit(1);
+    }
+
+    sock=socket(PF_INET, SOCK_STREAM, 0);
+
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family=AF_INET;
+    serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
+    serv_addr.sin_port=htons(atoi(argv[2]));
+
+    if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
+        error_handling("connect() error");
+    
+
+
         
         while(1)
 {   
@@ -165,7 +214,7 @@ int main(int argc, char* argv[]) {
         send_packet(packet, handle);
         sleep(1);
 }
-
+close(sock);
 	return 0;
 }
 
