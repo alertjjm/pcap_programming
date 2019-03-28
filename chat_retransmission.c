@@ -85,10 +85,10 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.ether_shost[4]=0x1d;
         packet.ether_shost[5]=0x1c;
 
-        packet.ether_type=htons(0x0800);
+        packet.ether_type=ntohs(0x0800);
         
-        packet.ip_buf=htons(0x4500);
-	packet.total_len=htons(0x0028);
+        packet.ip_buf=ntohs(0x4500);
+	packet.total_len=ntohs(0x0098);
 
         packet.ip_id=0x0000;
         packet.ip_off=0x0000;
@@ -114,7 +114,7 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         
         packet.th_flags=0x02;
         
-        packet.th_win=htons(0x7210);
+        packet.th_win=ntohs(0x7210);
         packet.th_sum=0x0000;
         packet.th_urp=0x0000;
     
