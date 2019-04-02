@@ -7,7 +7,7 @@ pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
 struct bpf_program fp; // 필터 구조체
-char *filter_exp = "port 80"; // 필터 표현식
+char *filter_exp = "port 9190"; // 필터 표현식
 bpf_u_int32 mask; // 서브넷 마스크
 bpf_u_int32 net; // 아이피 주소
 struct pcap_pkthdr *header; // 패킷 관련 정보
@@ -167,7 +167,11 @@ int main(void) {
         while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
 		printf("sending packet to target....\n");
-		send_packet(packet,handle);
+		strcpy(temp,inet_ntoa(ip->ip_dst));
+		if(strcmp(temp,inet_ntoa(addr)));
+		else{
+			send_packet(packet,handle);
+			}
         }
 	return 0;
 }
