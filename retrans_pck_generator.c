@@ -15,7 +15,8 @@ const u_char *packet; // 실제 패킷
 struct in_addr addr; // 주소 정보
 u_int32_t target_ip;
 #define ETHER_ADDR_LEN 6
-
+struct sniff_ip;
+struct sniff_tcp;
 struct sniff_ethernet {
         u_char ether_dhost[ETHER_ADDR_LEN]; // 목적지 MAC 주소
         u_char ether_shost[ETHER_ADDR_LEN]; // 출발지 MAC 주소
@@ -24,10 +25,9 @@ struct sniff_ethernet {
 
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
-
-void send_packet(const u_char *d_packet, pcap_t* handle)
-{
-	if(pcap_sendpacket(handle, d_packet, 42) != 0)
+int payload_len;
+void send_packet(const u_char *d_packet, pcap_t* handle){
+	if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
 		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
 struct sniff_ip {
@@ -87,7 +87,7 @@ tcp_seq dummy_seq;
 void parsing() {
 	
 	printf("------------------------------------------------------\n");
-        int i, payload_len;
+        int i;
         ethernet = (struct sniff_ethernet*)(packet);
         printf("MAC 출발지 주소 :");
         for(i = 0; i < ETHER_ADDR_LEN; i++) {
@@ -108,9 +108,26 @@ void parsing() {
         printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
         tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
         //
-		if(first==1)
-		dummy_seq=tcp->th_seq;//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
-	memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));//이후에 오는 모든 패킷에는 저장해놨던 dummy_seq내용 덮어쓰기
+		if(first==1){
+		printf("first packet: seqence: %d",ntohs(tcp->th_seq));
+		dummy_seq=ntohs(tcp->th_seq);//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
+		}
+	//
+	/*
+	u_int afaf=0x00;
+	memcpy(&packet[38],&afaf,sizeof(afaf));
+	memcpy(&packet[39],&afaf,sizeof(afaf));
+
+	memcpy(&packet[40],&afaf,sizeof(afaf));
+	memcpy(&packet[41],&afaf,sizeof(afaf));
+	*/
+	u_int zero=0;
+	memcpy(&packet[38],&zero,sizeof(zero));
+	memcpy(&packet[40],&dummy_seq,sizeof(dummy_seq));
+	
+		
+	
+	//memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));//이후에 오는 모든 패킷에는 저장해놨던 dummy_seq내용 덮어쓰기
 	size_tcp = TH_OFF(tcp)*4;
         printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
         printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
@@ -120,8 +137,8 @@ void parsing() {
         if(payload_len == 0) printf("페이로드 데이터가 없습니다.");
         else {
                 printf("< 페이로드 데이터 >\n");
-                for(int i = 1; i < payload_len; i++) {
-                        printf("%02x ", payload[i - 1]);
+                for(int i = 1; i < ntohs(ip->ip_len)+payload_len; i++) {
+                        printf("%02x ", packet[i - 1]);
                         if(i % 8 == 0) printf("  ");
                         if(i % 16 == 0) printf("\n");
                 }
@@ -167,11 +184,7 @@ int main(void) {
         while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
 		printf("sending packet to target....\n");
-		strcpy(temp,inet_ntoa(ip->ip_dst));
-		if(strcmp(temp,inet_ntoa(addr)));
-		else{
-			send_packet(packet,handle);
-			}
+		send_packet(packet,handle);
         }
 	return 0;
 }
