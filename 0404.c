@@ -2,6 +2,8 @@
 #include <pcap.h> // PCAP 라이브러리 가져오기
 #include <arpa/inet.h> // inet_ntoa 등 함수 포함
 #include <netinet/in.h> // in_addr 등 구조체 포함
+#include <net/if.h>
+#include<sys/ioctl.h>
 
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
@@ -145,7 +147,25 @@ void parsing() {
         printf("\n------------------------------------------------------\n");
 	//패킷이 넘어갈때마다 1씩증가
 }
-
+int isipsame(){
+	struct ifreq ifr;
+	char myip[40];
+	char temp[40];
+	int s;
+	s=socket(AF_INET,SOCK_DGRAM,0);
+	strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
+	if(ioctl(s,SIOCGIFADDR, &ifr)<0){
+		printf("Error");
+	}
+	else{
+		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
+	}
+	strcpy(temp,inet_ntoa(ip->ip_src));
+	if(strcmp(myip,temp)==0)
+		return 1;
+	else
+		return 0;
+}
 int main(void) {
 	char temp[50];
 	printf("target ip address: ");
@@ -182,6 +202,8 @@ int main(void) {
         printf("패킷을 감지합니다.\n");
         while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
+		if(isipsame()==1)
+			continue;
 		printf("sending packet to target....\n");
 		send_packet(packet,handle);
         }
