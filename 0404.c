@@ -109,26 +109,13 @@ void parsing() {
         printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
         printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
         tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-        //
 		if(first==1){
 		printf("first packet: seqence: %d",ntohs(tcp->th_seq));
 		dummy_seq=ntohl(tcp->th_seq);//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
 		first++;
 		}
-	//
-	/*
-	u_int afaf=0x00;
-	memcpy(&packet[38],&afaf,sizeof(afaf));
-	memcpy(&packet[39],&afaf,sizeof(afaf));
 
-	memcpy(&packet[40],&afaf,sizeof(afaf));
-	memcpy(&packet[41],&afaf,sizeof(afaf));
-	*/
 	memcpy(&packet[38],&dummy_seq,sizeof(dummy_seq));
-	
-		
-	
-	//memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));//이후에 오는 모든 패킷에는 저장해놨던 dummy_seq내용 덮어쓰기
 	size_tcp = TH_OFF(tcp)*4;
         printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
         printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
@@ -147,11 +134,12 @@ void parsing() {
         printf("\n------------------------------------------------------\n");
 	//패킷이 넘어갈때마다 1씩증가
 }
-int isipsame(){
+int isfiltered(){
 	struct ifreq ifr;
 	char myip[40];
 	char temp[40];
 	int s;
+	int result;
 	s=socket(AF_INET,SOCK_DGRAM,0);
 	strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
 	if(ioctl(s,SIOCGIFADDR, &ifr)<0){
@@ -161,10 +149,22 @@ int isipsame(){
 		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
 	}
 	strcpy(temp,inet_ntoa(ip->ip_src));
-	if(strcmp(myip,temp)==0)
-		return 1;
+	printf("ip: %s\n", temp);
+	printf("myip: %s\n", myip);
+	if(strcmp(myip,temp)==0){
+		result=1;
+		printf("hit!\n");
+		return result;
+	}
 	else
-		return 0;
+		result= 0;
+	if(tcp->th_flags==TH_ACK){
+		result=1;
+		return result;
+	}
+	else
+		result=0;
+	return result;
 }
 int main(void) {
 	char temp[50];
@@ -202,10 +202,12 @@ int main(void) {
         printf("패킷을 감지합니다.\n");
         while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
-		if(isipsame()==1)
-			continue;
+		if(isfiltered()==1)
+			printf("!!!PASSED PACKET!!!\n");
+		else{
 		printf("sending packet to target....\n");
 		send_packet(packet,handle);
+		}
         }
 	return 0;
 }
