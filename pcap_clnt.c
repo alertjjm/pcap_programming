@@ -12,7 +12,7 @@
 #include <netinet/in.h> // in_addr 등 구조체 포함
 #include <net/if.h>
 #include<sys/ioctl.h>
-void parsing();
+
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -36,11 +36,6 @@ struct sniff_ethernet {
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 int payload_len;
-void send_packet(const u_char *d_packet, pcap_t* handle){
-        if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
-                fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
-}
-
 struct sniff_ip {
         u_char ip_vhl;
         u_char ip_tos;
@@ -90,26 +85,80 @@ struct sniff_tcp *tcp; // TCP 혜더
 char *payload; // 페이로드
 u_int size_ip;
 u_int size_tcp;
+char myip[40];
+int isfiltered(){
+        struct ifreq ifr;
+        
+        char temp[40];
+        int s;
+        int result;
+        s=socket(AF_INET,SOCK_DGRAM,0);
+        strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
+        if(ioctl(s,SIOCGIFADDR, &ifr)<0){
+                printf("Error");
+        }
+        else{
+                inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
+        }
+        strcpy(temp,inet_ntoa(ip->ip_src));
+        //printf("ip: %s\n", temp);
+        //printf("myip: %s\n", myip);
+        if(strcmp(myip,temp)==0){
+                result=1;
+                //printf("hit!\n");
+                return result;
+        }
+        else
+                result= 0;
+        if(tcp->th_flags==TH_ACK){
+                result=1;
+                return result;
+        }
+        else
+                result=0;
+        return result;
+}
 
 void parsing() {
+        printf("------------------------------------------------------\n");
         int i, payload_len;
-	ethernet = (struct sniff_ethernet*)(packet);
-	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-
+        ethernet = (struct sniff_ethernet*)(packet);
+        /*
+	printf("MAC 출발지 주소 :");
+        for(i = 0; i < ETHER_ADDR_LEN; i++) {
+                printf("%02x ", ethernet->ether_shost[i]);
+        }
+        printf("\nMAC 목적지 주소 :");
+        for(i = 0; i < ETHER_ADDR_LEN; i++) {
+                printf("%02x ", ethernet->ether_dhost[i]);
+        }
+        printf("\nMAC 목적지 주소 :");
+        for(i = 0; i < ETHER_ADDR_LEN; i++) {
+                printf("%02x ", ethernet->ether_dhost[i]);
+        }
+        ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
+        */
 	size_ip = IP_HL(ip)*4;
-	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+        //printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
+        //printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
+        tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
         size_tcp = TH_OFF(tcp)*4;
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+        //printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
+        //printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
+        payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
-        if(payload_len == 0);
-        else {
+        if(payload_len == 0);// printf("페이로드 데이터가 없습니다.");
+        else if(strcmp(myip,inet_ntoa(ip->ip_src))==0);
+	else {
                 printf("< ECHO 수신 데이터 >\n");
                 for(int i = 1; i < payload_len; i++) {
                         printf("%c", payload[i - 1]);
+                        //if(i % 8 == 0) printf("  ");
+                        //if(i % 16 == 0) printf("\n");
                 }
 		printf("\n------------------------------------------------------\n");
+
         }
-	return 0;
 }
 
 
@@ -147,7 +196,7 @@ int main(int argc, char * argv[])
         error_handling("connect() error");
     
     pthread_create(&snd_thread, NULL, send_msg, (void*)&sock);
-    pthread_create(&rcv_thread,NULL,recv_msg,(void*)&sock);
+    pthread_create(&rcv_thread, NULL, recv_msg, (void*)&sock);
     pthread_join(snd_thread, &thread_return);
     pthread_join(rcv_thread, &thread_return);
     close(sock);
@@ -172,7 +221,7 @@ void * send_msg(void * arg)
     return NULL;
 }
 
-void * recv_msg(void* arg)
+void * recv_msg(void * arg)
 {
     dev = pcap_lookupdev(errbuf);
         if (dev == NULL) {
@@ -202,9 +251,11 @@ void * recv_msg(void* arg)
                 printf("필터를 세팅할 수 없습니다.\n");
                 return 0;
         }
-	while(pcap_next_ex(handle, &header, &packet) == 1) {
+	/*while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
-        }
+        }*/
+	if(isfiltered()!=1)
+		parsing();
 
 
     return NULL;

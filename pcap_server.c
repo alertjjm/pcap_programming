@@ -22,7 +22,7 @@ int clnt_cnt=0;
 int clnt_socks[MAX_CLNT];
 pthread_mutex_t mutx;
 
-
+char myip[40];
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -34,6 +34,7 @@ struct pcap_pkthdr *header; // 패킷 관련 정보
 const u_char *packet; // 실제 패킷
 struct in_addr addr; // 주소 정보
 u_int32_t target_ip;
+u_int32_t m_ip;
 #define ETHER_ADDR_LEN 6
 struct sniff_ip;
 struct sniff_tcp;
@@ -165,7 +166,7 @@ void parsing() {
 }
 int isfiltered(){
 	struct ifreq ifr;
-	char myip[40];
+	
 	char temp[40];
 	int s;
 	int result;
@@ -276,7 +277,9 @@ void * handle_clnt(void * arg)
                         //printf("!!!PASSED PACKET!!!\n");
                 else{
                 printf("sending packet to target....\n");
-                send_packet(packet,handle);
+                m_ip=inet_addr(myip);
+		memcpy(&(ip->ip_src.s_addr),&m_ip,sizeof(m_ip)); 
+		send_packet(packet,handle);
                 }
         }
     pthread_mutex_lock(&mutx);
