@@ -136,8 +136,9 @@ void parsing() {
         for(i = 0; i < ETHER_ADDR_LEN; i++) {
                 printf("%02x ", ethernet->ether_dhost[i]);
         }
+	*/
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        */
+        
 	size_ip = IP_HL(ip)*4;
         //printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
         //printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
@@ -148,7 +149,7 @@ void parsing() {
         payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         if(payload_len == 0);// printf("페이로드 데이터가 없습니다.");
-        else if(strcmp(myip,inet_ntoa(ip->ip_src))==0);
+        
 	else {
                 printf("< ECHO 수신 데이터 >\n");
                 for(int i = 1; i < payload_len; i++) {
