@@ -106,63 +106,30 @@ int first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 �
 tcp_seq dummy_seq;
 
 void parsing() {
-	
-	//printf("------------------------------------------------------\n");
         int i;
         ethernet = (struct sniff_ethernet*)(packet);
-        /*
-	printf("MAC 출발지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_shost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-	*/
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
         memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip)); //정종민: 패킷의 목적지 ip를 타겟의 ip로 변경
 	size_ip = IP_HL(ip)*4;
-        //printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
-        //printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
         tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-		if(first==1){
-		//printf("first packet: seqence: %d",ntohs(tcp->th_seq));
+	if(first==1){
 		dummy_seq=ntohl(tcp->th_seq);//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
 		first++;
-		}
+	}
 
 	memcpy(&packet[38],&dummy_seq,sizeof(dummy_seq));
 	size_tcp = TH_OFF(tcp)*4;
-        //printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
-        //printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
-        //printf("seq: %d\n", ntohs(tcp->th_seq));
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         if(payload_len == 0);
-	//printf("페이로드 데이터가 없습니다.");
         else {
                 printf("< 페이로드 데이터 >\n");
                 for(int i = 1; i < payload_len; i++) {
                         printf("%c", payload[i - 1]);
                 }
-
-		/*
-		for(int i = 1; i < ntohs(ip->ip_len)+payload_len; i++) {
-                        printf("%c", packet[i - 1]);
-                        if(i % 8 == 0) printf("  ");
-                        if(i % 16 == 0) printf("\n");
-                }
-		*/
 		printf("\n------------------------------------------------------\n");
 
         }
-        //printf("\n------------------------------------------------------\n");
-	//패킷이 넘어갈때마다 1씩증가
 }
 int isfiltered(){
 	struct ifreq ifr;
@@ -179,16 +146,13 @@ int isfiltered(){
 		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
 	}
 	strcpy(temp,inet_ntoa(ip->ip_src));
-	//printf("ip: %s\n", temp);
-	//printf("myip: %s\n", myip);
 	if(strcmp(myip,temp)==0){
 		result=1;
-		//printf("hit!\n");
 		return result;
 	}
 	else
 		result= 0;
-	if(tcp->th_flags==TH_ACK){
+	if(tcp->th_flags!=0x18){
 		result=1;
 		return result;
 	}
@@ -247,15 +211,12 @@ void * handle_clnt(void * arg)
                 printf("네트워크 장치를 찾을 수 없습니다.\n");
                 return 0;
         }
-        //printf("나의 네트워크 장치: %s\n", dev);
         if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
                 printf("장치의 주소를 찾을 수 없습니다.\n");
                 return 0;
         }
         addr.s_addr = net;
-        //printf("나의 IP주소: %s\n", inet_ntoa(addr));
         addr.s_addr = mask;
-        //printf("나의 서브넷 마스크: %s\n", inet_ntoa(addr));
         handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
         if (handle == NULL) {
                 printf("장치를 열 수 없습니다.\n");
@@ -274,7 +235,6 @@ void * handle_clnt(void * arg)
         while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
                 if(isfiltered()==1);
-                        //printf("!!!PASSED PACKET!!!\n");
                 else{
                 printf("sending packet to target....\n");
                 m_ip=inet_addr(myip);
@@ -282,24 +242,24 @@ void * handle_clnt(void * arg)
 		send_packet(packet,handle);
                 }
         }
-    pthread_mutex_lock(&mutx);
-    for(i=0; i<clnt_cnt; i++)
-    {
-        if(clnt_sock==clnt_socks[i])
-        {
-            while(i++<clnt_cnt-1)
-                clnt_socks[i]=clnt_socks[i+1];
-            break;
-        }
-    }
-    clnt_cnt--;
-    pthread_mutex_unlock(&mutx);
-    close(clnt_sock);
-    return NULL;
+    	pthread_mutex_lock(&mutx);
+    	for(i=0; i<clnt_cnt; i++)
+    	{
+        	if(clnt_sock==clnt_socks[i])
+        	{
+            	while(i++<clnt_cnt-1)
+                	clnt_socks[i]=clnt_socks[i+1];
+            	break;
+        	}	
+    	}
+    	clnt_cnt--;
+    	pthread_mutex_unlock(&mutx);
+    	close(clnt_sock);
+    	return NULL;
 }
 void error_handling(char * msg)
 {
-    fputs(msg, stderr);
-    fputc('\n', stderr);
-    exit(1);
+    	fputs(msg, stderr);
+    	fputc('\n', stderr);
+    	exit(1);
 }

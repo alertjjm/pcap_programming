@@ -32,10 +32,15 @@ struct sniff_ethernet {
         u_char ether_shost[ETHER_ADDR_LEN]; // 출발지 MAC 주소
         u_short ether_type;
 };
-
+char myip[40];
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 int payload_len;
+void send_packet(const u_char *d_packet, pcap_t* handle){
+        if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
+                fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
+}
+
 struct sniff_ip {
         u_char ip_vhl;
         u_char ip_tos;
@@ -85,159 +90,103 @@ struct sniff_tcp *tcp; // TCP 혜더
 char *payload; // 페이로드
 u_int size_ip;
 u_int size_tcp;
-char myip[40];
-int isfiltered(){
-        struct ifreq ifr;
-        
-        char temp[40];
-        int s;
-        int result;
-        s=socket(AF_INET,SOCK_DGRAM,0);
-        strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
-        if(ioctl(s,SIOCGIFADDR, &ifr)<0){
-                printf("Error");
-        }
-        else{
-                inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
-        }
-        strcpy(temp,inet_ntoa(ip->ip_src));
-        //printf("ip: %s\n", temp);
-        //printf("myip: %s\n", myip);
-        if(strcmp(myip,temp)==0){
-                result=1;
-                //printf("hit!\n");
-                return result;
-        }
-        else
-                result= 0;
-        if(tcp->th_flags==TH_ACK){
-                result=1;
-                return result;
-        }
-        else
-                result=0;
-        return result;
-}
 
 void parsing() {
-        printf("------------------------------------------------------\n");
         int i, payload_len;
-        ethernet = (struct sniff_ethernet*)(packet);
-        /*
-	printf("MAC 출발지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_shost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-	*/
+
+	ethernet = (struct sniff_ethernet*)(packet);
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        
 	size_ip = IP_HL(ip)*4;
-        //printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
-        //printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
         tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-        size_tcp = TH_OFF(tcp)*4;
-        //printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
-        //printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
-        payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
+	size_tcp = TH_OFF(tcp)*4;
+	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+	payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         if(payload_len == 0);// printf("페이로드 데이터가 없습니다.");
-        
+	else if(strcmp(myip,inet_ntoa(ip->ip_src))==0);
 	else {
                 printf("< ECHO 수신 데이터 >\n");
                 for(int i = 1; i < payload_len; i++) {
                         printf("%c", payload[i - 1]);
-                        //if(i % 8 == 0) printf("  ");
-                        //if(i % 16 == 0) printf("\n");
                 }
 		printf("\n------------------------------------------------------\n");
-
         }
 }
-
-
-
-
 
 void * send_msg(void * arg);
 void * recv_msg(void * arg);
 void error_handling(char * msg);
-
 char name[NAME_SIZE]="[DEFAULT]";
 char msg[BUF_SIZE];
 
 int main(int argc, char * argv[])
 {
-    int sock;
-    struct sockaddr_in serv_addr;
-    pthread_t snd_thread, rcv_thread;
-    void * thread_return;
-    if(argc!=4)
-    {
-        printf("Usage : %s <IP> <port> <name>\n", argv[0]);
-        exit(1);
-    }
-
-    sprintf(name, "[%s]", argv[3]);
-    sock=socket(PF_INET, SOCK_STREAM, 0);
-
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family=AF_INET;
-    serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
-    serv_addr.sin_port=htons(atoi(argv[2]));
-
-    if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
-        error_handling("connect() error");
-    
-    pthread_create(&snd_thread, NULL, send_msg, (void*)&sock);
-    pthread_create(&rcv_thread, NULL, recv_msg, (void*)&sock);
-    pthread_join(snd_thread, &thread_return);
-    pthread_join(rcv_thread, &thread_return);
-    close(sock);
-    return 0;
+	int sock;
+    	struct sockaddr_in serv_addr;
+    	pthread_t snd_thread, rcv_thread;
+    	void * thread_return;
+    	if(argc!=4)
+    	{
+        	printf("Usage : %s <IP> <port> <name>\n", argv[0]);
+        	exit(1);
+    	}
+struct ifreq ifr;
+	int s;
+	int result;
+	s=socket(AF_INET,SOCK_DGRAM,0);
+	strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
+	if(ioctl(s,SIOCGIFADDR, &ifr)<0){
+		printf("Error");
+	}
+	else{
+		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
+	}
+	sprintf(name, "[%s]", argv[3]);
+	sock=socket(PF_INET, SOCK_STREAM, 0);
+	memset(&serv_addr, 0, sizeof(serv_addr));
+	serv_addr.sin_family=AF_INET;
+	serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
+	serv_addr.sin_port=htons(atoi(argv[2]));
+    	if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
+        	error_handling("connect() error");
+    	pthread_create(&snd_thread, NULL, send_msg, (void*)&sock);
+    	pthread_create(&rcv_thread, NULL, recv_msg, (void*)&sock);
+    	pthread_join(snd_thread, &thread_return);
+    	pthread_join(rcv_thread, &thread_return);
+    	close(sock);
+    	return 0;
 }
 
 void * send_msg(void * arg)
 {
-    int sock=*((int*)arg);
-    char name_msg[NAME_SIZE+BUF_SIZE];
-    while(1)
-    {
-        fgets(msg, BUF_SIZE, stdin);
-        if(!strcmp(msg,"q\n")||!strcmp(msg,"Q\n"))
-        {
-            close(sock);
-            exit(0);
-        }
-        sprintf(name_msg, "%s %s", name, msg);
-        write(sock, name_msg, strlen(name_msg));
-    }
-    return NULL;
+    	int sock=*((int*)arg);
+    	char name_msg[NAME_SIZE+BUF_SIZE];
+    	while(1)
+   	{
+        	fgets(msg, BUF_SIZE, stdin);
+        	if(!strcmp(msg,"q\n")||!strcmp(msg,"Q\n"))
+        	{
+            		close(sock);
+            		exit(0);
+        	}
+        	sprintf(name_msg, "%s %s", name, msg);
+        	write(sock, name_msg, strlen(name_msg));
+    	}
+    	return NULL;
 }
 
 void * recv_msg(void * arg)
 {
-    dev = pcap_lookupdev(errbuf);
+	dev = pcap_lookupdev(errbuf);
         if (dev == NULL) {
                 printf("네트워크 장치를 찾을 수 없습니다.\n");
                 return 0;
         }
-        //printf("나의 네트워크 장치: %s\n", dev);
         if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
                 printf("장치의 주소를 찾을 수 없습니다.\n");
                 return 0;
         }
         addr.s_addr = net;
-        //printf("나의 IP주소: %s\n", inet_ntoa(addr));
         addr.s_addr = mask;
-        //printf("나의 서브넷 마스크: %s\n", inet_ntoa(addr));
         handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
         if (handle == NULL) {
                 printf("장치를 열 수 없습니다.\n");
@@ -252,14 +201,10 @@ void * recv_msg(void * arg)
                 printf("필터를 세팅할 수 없습니다.\n");
                 return 0;
         }
-	/*while(pcap_next_ex(handle, &header, &packet) == 1) {
+	while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
-        }*/
-	if(isfiltered()!=1)
-		parsing();
-
-
-    return NULL;
+        }
+	return NULL;
 }
 
 void error_handling(char *msg)
