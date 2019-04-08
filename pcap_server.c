@@ -106,7 +106,7 @@ tcp_seq dummy_seq;
 
 void parsing() {
 	
-	printf("------------------------------------------------------\n");
+	//printf("------------------------------------------------------\n");
         int i;
         ethernet = (struct sniff_ethernet*)(packet);
         /*
@@ -142,7 +142,8 @@ void parsing() {
         //printf("seq: %d\n", ntohs(tcp->th_seq));
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
-        if(payload_len == 0) printf("페이로드 데이터가 없습니다.");
+        if(payload_len == 0);
+	//printf("페이로드 데이터가 없습니다.");
         else {
                 printf("< 페이로드 데이터 >\n");
                 for(int i = 1; i < payload_len; i++) {
@@ -156,8 +157,10 @@ void parsing() {
                         if(i % 16 == 0) printf("\n");
                 }
 		*/
+		printf("\n------------------------------------------------------\n");
+
         }
-        printf("\n------------------------------------------------------\n");
+        //printf("\n------------------------------------------------------\n");
 	//패킷이 넘어갈때마다 1씩증가
 }
 int isfiltered(){
@@ -175,11 +178,11 @@ int isfiltered(){
 		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
 	}
 	strcpy(temp,inet_ntoa(ip->ip_src));
-	printf("ip: %s\n", temp);
-	printf("myip: %s\n", myip);
+	//printf("ip: %s\n", temp);
+	//printf("myip: %s\n", myip);
 	if(strcmp(myip,temp)==0){
 		result=1;
-		printf("hit!\n");
+		//printf("hit!\n");
 		return result;
 	}
 	else
