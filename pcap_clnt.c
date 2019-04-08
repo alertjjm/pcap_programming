@@ -1,10 +1,18 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h> 
+#include <string.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <pthread.h>
+#define BUF_SIZE 100
+#define NAME_SIZE 20
 #include <pcap.h> // PCAP 라이브러리 가져오기
 #include <arpa/inet.h> // inet_ntoa 등 함수 포함
 #include <netinet/in.h> // in_addr 등 구조체 포함
 #include <net/if.h>
 #include<sys/ioctl.h>
-
+void parsing();
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -29,9 +37,10 @@ struct sniff_ethernet {
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 int payload_len;
 void send_packet(const u_char *d_packet, pcap_t* handle){
-	if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
-		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
+        if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
+                fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
+
 struct sniff_ip {
         u_char ip_vhl;
         u_char ip_tos;
@@ -79,117 +88,111 @@ struct sniff_ethernet *ethernet; // 이더넷 헤더
 struct sniff_ip *ip;// IP 헤더
 struct sniff_tcp *tcp; // TCP 혜더
 char *payload; // 페이로드
-struct sniff_tcp *dummy_tcp;
-struct sniff_ip *dummy_ip;
 u_int size_ip;
 u_int size_tcp;
-int first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 변수
-tcp_seq dummy_seq;
 
 void parsing() {
-	
-	printf("------------------------------------------------------\n");
-        int i;
-        ethernet = (struct sniff_ethernet*)(packet);
-        printf("MAC 출발지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_shost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-        ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip)); //정종민: 패킷의 목적지 ip를 타겟의 ip로 변경
-	size_ip = IP_HL(ip)*4;
-        printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
-        printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
-        tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-		if(first==1){
-		printf("first packet: seqence: %d",ntohs(tcp->th_seq));
-		dummy_seq=ntohl(tcp->th_seq);//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
-		first++;
-		}
+        int i, payload_len;
+	ethernet = (struct sniff_ethernet*)(packet);
+	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
 
-	memcpy(&packet[38],&dummy_seq,sizeof(dummy_seq));
-	size_tcp = TH_OFF(tcp)*4;
-        printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
-        printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
-        printf("seq: %d\n", ntohs(tcp->th_seq));
+	size_ip = IP_HL(ip)*4;
+	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+        size_tcp = TH_OFF(tcp)*4;
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
-        if(payload_len == 0) printf("페이로드 데이터가 없습니다.");
+        if(payload_len == 0);
         else {
-                printf("< 페이로드 데이터 >\n");
-                for(int i = 1; i < ntohs(ip->ip_len)+payload_len; i++) {
-                        printf("%02x ", packet[i - 1]);
-                        if(i % 8 == 0) printf("  ");
-                        if(i % 16 == 0) printf("\n");
+                printf("< ECHO 수신 데이터 >\n");
+                for(int i = 1; i < payload_len; i++) {
+                        printf("%c", payload[i - 1]);
                 }
+		printf("\n------------------------------------------------------\n");
         }
-        printf("\n------------------------------------------------------\n");
-	//패킷이 넘어갈때마다 1씩증가
+	return 0;
 }
-int isfiltered(){
-	struct ifreq ifr;
-	char myip[40];
-	char temp[40];
-	int s;
-	int result;
-	s=socket(AF_INET,SOCK_DGRAM,0);
-	strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
-	if(ioctl(s,SIOCGIFADDR, &ifr)<0){
-		printf("Error");
-	}
-	else{
-		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
-	}
-	strcpy(temp,inet_ntoa(ip->ip_src));
-	printf("ip: %s\n", temp);
-	printf("myip: %s\n", myip);
-	if(strcmp(myip,temp)==0){
-		result=1;
-		printf("hit!\n");
-		return result;
-	}
-	else
-		result= 0;
-	if(tcp->th_flags==TH_ACK){
-		result=1;
-		return result;
-	}
-	else
-		result=0;
-	return result;
+
+
+
+
+
+void * send_msg(void * arg);
+void * recv_msg(void * arg);
+void error_handling(char * msg);
+
+char name[NAME_SIZE]="[DEFAULT]";
+char msg[BUF_SIZE];
+
+int main(int argc, char * argv[])
+{
+    int sock;
+    struct sockaddr_in serv_addr;
+    pthread_t snd_thread, rcv_thread;
+    void * thread_return;
+    if(argc!=4)
+    {
+        printf("Usage : %s <IP> <port> <name>\n", argv[0]);
+        exit(1);
+    }
+
+    sprintf(name, "[%s]", argv[3]);
+    sock=socket(PF_INET, SOCK_STREAM, 0);
+
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family=AF_INET;
+    serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
+    serv_addr.sin_port=htons(atoi(argv[2]));
+
+    if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
+        error_handling("connect() error");
+    
+    pthread_create(&snd_thread, NULL, send_msg, (void*)&sock);
+    pthread_create(&rcv_thread,NULL,recv_msg,(void*)&sock);
+    pthread_join(snd_thread, &thread_return);
+    pthread_join(rcv_thread, &thread_return);
+    close(sock);
+    return 0;
 }
-int main(void) {
-	char temp[50];
-	printf("target ip address: ");
-	scanf("%s", temp);
-	target_ip=inet_addr(temp);
-	dev = pcap_lookupdev(errbuf);
+
+void * send_msg(void * arg)
+{
+    int sock=*((int*)arg);
+    char name_msg[NAME_SIZE+BUF_SIZE];
+    while(1)
+    {
+        fgets(msg, BUF_SIZE, stdin);
+        if(!strcmp(msg,"q\n")||!strcmp(msg,"Q\n"))
+        {
+            close(sock);
+            exit(0);
+        }
+        sprintf(name_msg, "%s %s", name, msg);
+        write(sock, name_msg, strlen(name_msg));
+    }
+    return NULL;
+}
+
+void * recv_msg(void* arg)
+{
+    dev = pcap_lookupdev(errbuf);
         if (dev == NULL) {
                 printf("네트워크 장치를 찾을 수 없습니다.\n");
                 return 0;
         }
-        printf("나의 네트워크 장치: %s\n", dev);
+        //printf("나의 네트워크 장치: %s\n", dev);
         if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
                 printf("장치의 주소를 찾을 수 없습니다.\n");
                 return 0;
         }
         addr.s_addr = net;
-        printf("나의 IP주소: %s\n", inet_ntoa(addr));
+        //printf("나의 IP주소: %s\n", inet_ntoa(addr));
         addr.s_addr = mask;
-        printf("나의 서브넷 마스크: %s\n", inet_ntoa(addr));
+        //printf("나의 서브넷 마스크: %s\n", inet_ntoa(addr));
         handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
         if (handle == NULL) {
                 printf("장치를 열 수 없습니다.\n");
                 printf("error message: %s", errbuf);
-		return 0;
+                return 0;
         }
         if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
                 printf("필터를 적용할 수 없습니다.\n");
@@ -199,15 +202,17 @@ int main(void) {
                 printf("필터를 세팅할 수 없습니다.\n");
                 return 0;
         }
-        printf("패킷을 감지합니다.\n");
-        while(pcap_next_ex(handle, &header, &packet) == 1) {
+	while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
-		if(isfiltered()==1)
-			printf("!!!PASSED PACKET!!!\n");
-		else{
-		printf("sending packet to target....\n");
-		send_packet(packet,handle);
-		}
         }
-	return 0;
+
+
+    return NULL;
+}
+
+void error_handling(char *msg)
+{
+    fputs(msg, stderr);
+    fputc('\n', stderr);
+    exit(1);
 }
