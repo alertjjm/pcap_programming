@@ -16,8 +16,6 @@
 void * from_handle();
 void * to_handle();
 
-void send_msg(char * msg, int len);
-void error_handling(char * msg);
 
 int clnt_cnt=0;
 int clnt_socks[MAX_CLNT];
@@ -126,7 +124,53 @@ int main(int argc, char* argv[]){
 	pthread_detach(t_id2);
 	return 0;
 }
-
+void parsing(){
+	int i;
+	ethernet=(struct sniff_ethernet*)(packet);
+	ip=(struct sniff_ip*)(packet+SIZE_ETHERNET);
+	size_ip= IP_HL(ip)*4;
+	tcp=(struct sniff_tcp*)(packet+SIZE_ETHERNET+size_ip);
+	size_tcp=TH_OFF(tcp)*4;
+	payload=(u_char*)(packet+SIZE_ETHERNET+size_ip+size_tcp);
+	/*
+	if(payload_len == 0);
+        else {
+                printf("< 페이로드 데이터 >\n");
+                for(int i = 1; i < payload_len; i++) {
+                        printf("%c", payload[i - 1]);
+                }
+		printf("\n------------------------------------------------------\n");
+        }
+	 */
+}
+int isfiltered(){
+	struct ifreq ifr;
+	char temp[40];
+	int s;
+	int result;
+	s=socket(AF_INET,SOCK_DGRAM,0);
+	strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
+	if(ioctl(s,SIOCGIFADDR, &ifr)<0){
+		printf("Error");
+	}
+	else{
+		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
+	}
+	strcpy(temp,inet_ntoa(ip->ip_src));
+	if(strcmp(myip,temp)==0){
+		result=1;
+		return result;
+	}
+	else
+		result= 0;
+	if(tcp->th_flags!=0x18){
+		result=1;
+		return result;
+	}
+	else
+		result=0;
+	return result;
+}
 void* to_handle(){
 }
 void* from_handle(){
