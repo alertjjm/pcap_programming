@@ -3,8 +3,8 @@
 #include <arpa/inet.h> // inet_ntoa 등 함수 포함
 #include <netinet/in.h> // in_addr 등 구조체 포함
 #include <net/if.h>
-#include<sys/ioctl.h>
-#include<stdlib.h>
+#include <sys/ioctl.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -13,8 +13,9 @@
 #include <pthread.h>
 #define BUF_SIZE 100
 #define MAX_CLNT 256
+void * from_handle();
+void * to_handle();
 
-void * handle_clnt(void * arg);
 void send_msg(char * msg, int len);
 void error_handling(char * msg);
 
@@ -105,163 +106,24 @@ u_int size_tcp;
 int first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 변수
 tcp_seq dummy_seq;
 
-void parsing() {
-        int i;
-        ethernet = (struct sniff_ethernet*)(packet);
-        ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip)); //정종민: 패킷의 목적지 ip를 타겟의 ip로 변경
-	size_ip = IP_HL(ip)*4;
-        tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-	if(first==1){
-		dummy_seq=ntohl(tcp->th_seq);//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
-		first++;
-	}
-
-	memcpy(&packet[38],&dummy_seq,sizeof(dummy_seq));
-	size_tcp = TH_OFF(tcp)*4;
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
-        if(payload_len == 0);
-        else {
-                printf("< 페이로드 데이터 >\n");
-                for(int i = 1; i < payload_len; i++) {
-                        printf("%c", payload[i - 1]);
-                }
-		printf("\n------------------------------------------------------\n");
-
-        }
-}
-int isfiltered(){
-	struct ifreq ifr;
-	
-	char temp[40];
-	int s;
-	int result;
-	s=socket(AF_INET,SOCK_DGRAM,0);
-	strncpy(ifr.ifr_name,"ens33",IFNAMSIZ);
-	if(ioctl(s,SIOCGIFADDR, &ifr)<0){
-		printf("Error");
-	}
-	else{
-		inet_ntop(AF_INET,ifr.ifr_addr.sa_data+2,myip,sizeof(struct sockaddr));
-	}
-	strcpy(temp,inet_ntoa(ip->ip_src));
-	if(strcmp(myip,temp)==0){
-		result=1;
-		return result;
-	}
-	else
-		result= 0;
-	if(tcp->th_flags!=0x18){
-		result=1;
-		return result;
-	}
-	else
-		result=0;
-	return result;
-}
-struct sockaddr_in serv_adr, clnt_adr;
+void parsing();
+int isfiltered();
+struct sockaddr_in my_adr, clnt_adr;
 int clnt_adr_sz;
 
-int main(int argc, char * argv[]) {
-	char temp[50];
-	int serv_sock, clnt_sock;
-    	pthread_t t_id;
-    	pthread_t t_id2;
-	if(argc!=2)
-    	{
-        	printf("Usage : %s <port>\n", argv[0]);
-        	exit(1);
-    	}
-
-    	pthread_mutex_init(&mutx, NULL);
-    	serv_sock=socket(PF_INET, SOCK_STREAM, 0);
-    	memset(&serv_adr, 0, sizeof(serv_adr));
-    	serv_adr.sin_family=AF_INET;
-    	serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);
-    	serv_adr.sin_port=htons(atoi(argv[1]));
-
-    	if(bind(serv_sock, (struct sockaddr*)&serv_adr, sizeof(serv_adr))==-1)
-        	error_handling("bind() error");
-    	if(listen(serv_sock, 5)==-1)
-        	error_handling("listen() error");
-	while(1)
-    	{
-        	clnt_adr_sz=sizeof(clnt_adr);
-        	clnt_sock=accept(serv_sock, (struct sockaddr*)&clnt_adr, &clnt_adr_sz);
-        	pthread_mutex_lock(&mutx);
-        	clnt_socks[clnt_cnt++]=clnt_sock;
-        	pthread_mutex_unlock(&mutx);
-        	pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
-        	pthread_detach(t_id);
-        	pthread_create(&t_id2, NULL,)
-		printf("Connected client IP: %s \n", inet_ntoa(clnt_adr.sin_addr));
-    	}
-    	close(serv_sock);
-	return 0;
-}
-void * handle_clnt(void * arg)
-{
-        int clnt_sock=*((int*)arg);
-        int str_len=0, i;
-        char msg[BUF_SIZE];
-        char temp[50];
-        strcpy(temp,inet_ntoa(clnt_adr.sin_addr));
-        target_ip=inet_addr(temp);
-        dev = pcap_lookupdev(errbuf);
-        if (dev == NULL) {
-                printf("네트워크 장치를 찾을 수 없습니다.\n");
-                return 0;
-        }
-        if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
-                printf("장치의 주소를 찾을 수 없습니다.\n");
-                return 0;
-        }
-        addr.s_addr = net;
-        addr.s_addr = mask;
-        handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-        if (handle == NULL) {
-                printf("장치를 열 수 없습니다.\n");
-                printf("error message: %s", errbuf);
-                return 0;
-        }
-        if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
-                printf("필터를 적용할 수 없습니다.\n");
-                return 0;
-        }
-        if (pcap_setfilter(handle, &fp) == -1) {
-                printf("필터를 세팅할 수 없습니다.\n");
-                return 0;
-        }
-        printf("패킷을 감지합니다.\n");
-        while(pcap_next_ex(handle, &header, &packet) == 1) {
-                parsing();
-                if(isfiltered()==1);
-                else{
-                printf("sending packet to target....\n");
-                m_ip=inet_addr(myip);
-		memcpy(&(ip->ip_src.s_addr),&m_ip,sizeof(m_ip)); 
-		send_packet(packet,handle);
-                }
-        }
-    	pthread_mutex_lock(&mutx);
-    	for(i=0; i<clnt_cnt; i++)
-    	{
-        	if(clnt_sock==clnt_socks[i])
-        	{
-            	while(i++<clnt_cnt-1)
-                	clnt_socks[i]=clnt_socks[i+1];
-            	break;
-        	}	
-    	}
-    	clnt_cnt--;
-    	pthread_mutex_unlock(&mutx);
-    	close(clnt_sock);
-    	return NULL;
-}
-void error_handling(char * msg)
-{
-    	fputs(msg, stderr);
-    	fputc('\n', stderr);
-    	exit(1);
+int main(int argc, char* argv[]){
+	pthread_t t_id, t_id2;
+	if(argc!=3){
+		printf("Usage : %s <to ip> <port>\n",argv[0]);
+		exit(1);
+	}
+	pthread_mutex_init(&mutx, NULL);
+	memset(&my_adr,0,sizeof(serv_adr));
+	my_adr.sin_family=AF_INET;
+	my_adr.sin_addr.s_addr=htonl(INADDR_ANY);
+	my_adr.sin_port=htons(atoi(argv[1]));
+	pthread_create(&t_id, NULL, from_handle,NULL);
+	pthread_detach(t_id);
+	pthread_create(&t_id2,NULL,to_handle,NULL);
+	pthread_detach(t_id2);
 }
