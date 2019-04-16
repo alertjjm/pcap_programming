@@ -99,8 +99,6 @@ struct sniff_ethernet *ethernet; // 이더넷 헤더
 struct sniff_ip *ip;// IP 헤더
 struct sniff_tcp *tcp; // TCP 혜더
 char *payload; // 페이로드
-struct sniff_tcp *dummy_tcp;
-struct sniff_ip *dummy_ip;
 u_int size_ip;
 u_int size_tcp;
 int first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 변수
@@ -118,7 +116,7 @@ int main(int argc, char* argv[]){
 		exit(1);
 	}
 	pthread_mutex_init(&mutx, NULL);
-	memset(&my_adr,0,sizeof(serv_adr));
+	memset(&my_adr,0,sizeof(my_adr));
 	my_adr.sin_family=AF_INET;
 	my_adr.sin_addr.s_addr=htonl(INADDR_ANY);
 	my_adr.sin_port=htons(atoi(argv[1]));
@@ -126,4 +124,10 @@ int main(int argc, char* argv[]){
 	pthread_detach(t_id);
 	pthread_create(&t_id2,NULL,to_handle,NULL);
 	pthread_detach(t_id2);
+	return 0;
+}
+
+void* to_handle(){
+}
+void* from_handle(){
 }
