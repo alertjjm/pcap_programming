@@ -15,13 +15,15 @@
 #define MAX_CLNT 256
 void * from_handle();
 void * to_handle();
-
-
+void showpayload();
+void pack();
+void unpack();
 int clnt_cnt=0;
 int clnt_socks[MAX_CLNT];
 pthread_mutex_t mutx;
 
 char myip[40];
+char toip[40];
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -113,11 +115,12 @@ int main(int argc, char* argv[]){
 		printf("Usage : %s <to ip> <port>\n",argv[0]);
 		exit(1);
 	}
+	strcpy(toip,argv[1]);
 	pthread_mutex_init(&mutx, NULL);
 	memset(&my_adr,0,sizeof(my_adr));
 	my_adr.sin_family=AF_INET;
 	my_adr.sin_addr.s_addr=htonl(INADDR_ANY);
-	my_adr.sin_port=htons(atoi(argv[1]));
+	my_adr.sin_port=htons(atoi(argv[2]));
 	pthread_create(&t_id, NULL, from_handle,NULL);
 	pthread_detach(t_id);
 	pthread_create(&t_id2,NULL,to_handle,NULL);
@@ -132,8 +135,13 @@ void parsing(){
 	tcp=(struct sniff_tcp*)(packet+SIZE_ETHERNET+size_ip);
 	size_tcp=TH_OFF(tcp)*4;
 	payload=(u_char*)(packet+SIZE_ETHERNET+size_ip+size_tcp);
-	/*
-	if(payload_len == 0);
+}
+
+void showpayload(){
+	int i;
+	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
+        if(payload_len == 0);
         else {
                 printf("< 페이로드 데이터 >\n");
                 for(int i = 1; i < payload_len; i++) {
@@ -141,8 +149,8 @@ void parsing(){
                 }
 		printf("\n------------------------------------------------------\n");
         }
-	 */
 }
+
 int isfiltered(){
 	struct ifreq ifr;
 	char temp[40];
@@ -171,7 +179,55 @@ int isfiltered(){
 		result=0;
 	return result;
 }
+
 void* to_handle(){
+	//pack&send
+	dev = pcap_lookupdev(errbuf);
+        if (dev == NULL) {
+                printf("네트워크 장치를 찾을 수 없습니다.\n");
+                return 0;
+        }
+        if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
+                printf("장치의 주소를 찾을 수 없습니다.\n");
+                return 0;
+        }
+        addr.s_addr = net;
+        addr.s_addr = mask;
+        handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+        if (handle == NULL) {
+                printf("장치를 열 수 없습니다.\n");
+                printf("error message: %s", errbuf);
+                return 0;
+        }
+        if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
+                printf("필터를 적용할 수 없습니다.\n");
+                return 0;
+        }
+        if (pcap_setfilter(handle, &fp) == -1) {
+                printf("필터를 세팅할 수 없습니다.\n");
+                return 0;
+        }
+	printf("패킷을 감지합니다.\n");
+	while(pcap_next_ex(handle, &header, &packet) == 1) {
+		parsing();
+		if(strcmp(toip,inet_ntoa(ip->ip_src))==0){
+			if(isfiltered()==1);
+			else{
+				printf("sending packet to target....\n");
+				send_packet(packet,handle);
+			}
+		}
+	}	
 }
+
 void* from_handle(){
+	//unpack&send
+}
+void pack(){
+	u_short header_size=htons(size_ip+size_tcp+SIZE_ETHERNET+ntohs(ip->ip_len));
+        memcpy(&(ip->ip_len),&header_size,sizeof(header_size));  //update ip_total_len as pckt size+fake header size
+
+}
+void unpack(){
+
 }
