@@ -220,7 +220,7 @@ void* to_handle(){
 	while(pcap_next_ex(handle, &header, &packet) == 1) {
 		parsing();
 		isfiltered();
-		if(strcmp(myip,inet_ntoa(ip->ip_dst))==0){
+		if(htons(ip->ip_len)<=130){
 			if(isfiltered()==1);
 			else{
 				printf("packing....\n");
@@ -266,7 +266,7 @@ void* from_handle(){
 	while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
                 isfiltered();
-                if(strcmp(myip,inet_ntoa(ip->ip_dst))==0){
+                if(htons(ip->ip_len)>130){//sujeong yomang
                         if(isfiltered()==1);
                         else{
                                 printf("unpacking....\n");
