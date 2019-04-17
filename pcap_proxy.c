@@ -27,6 +27,7 @@ char toip[40];
 char fromip[40];
 struct in_addr to_struct_ip;
 struct in_addr from_struct_ip;
+struct in_addr my_struct_ip;
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -185,6 +186,8 @@ int isfiltered(){
 	}
 	else
 		result=0;
+	inet_aton(myip,&my_struct_ip);
+
 	return result;
 }
 
@@ -287,6 +290,7 @@ void pack(){
 	}
 	memcpy(&packet[38],&to_dummy_seq,sizeof(to_dummy_seq));
 	memcpy(&(ip->ip_dst),&to_struct_ip,sizeof(to_struct_ip)); //update ip_dst as target ip
+	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
 	to_header_size=htons(132+payload_len);
         printf("%d %d\n", ntohs(to_header_size), payload_len);
 	memcpy(&(ip->ip_len),&to_header_size,sizeof(to_header_size));  //update ip_total_len as pckt size+fake header size
@@ -304,6 +308,8 @@ void unpack(){
 	memcpy(&packet[38]+66,&from_dummy_seq,sizeof(from_dummy_seq));
         memcpy(&(ip->ip_dst)+66,&from_struct_ip,sizeof(from_struct_ip)); //update ip_dst as target ip
 	memcpy(&(ip->ip_len)+66,&from_header_size,sizeof(from_header_size)); 
+	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
+
 	dummy_packet=(const u_char*)malloc(sizeof(const u_char)*htons(from_header_size));
 	memset(dummy_packet,0,sizeof(const u_char)*htons(from_header_size));
 	memcpy(dummy_packet,packet+66,sizeof(packet)*(66+payload_len));
