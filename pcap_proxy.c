@@ -24,6 +24,7 @@ pthread_mutex_t mutx;
 
 char myip[40];
 char toip[40];
+struct in_addr to_struct_ip;
 pcap_t *handle; // 핸들러
 char *dev = "ens33"; // 자신의 네트워크 장비
 char errbuf[PCAP_ERRBUF_SIZE]; // 오류 메시지를 저장하는 버퍼
@@ -33,9 +34,11 @@ bpf_u_int32 mask; // 서브넷 마스크
 bpf_u_int32 net; // 아이피 주소
 struct pcap_pkthdr *header; // 패킷 관련 정보
 const u_char *packet; // 실제 패킷
+const u_char *dummy_packet;
 struct in_addr addr; // 주소 정보
 u_int32_t target_ip;
 u_int32_t m_ip;
+u_short to_header_size;
 #define ETHER_ADDR_LEN 6
 struct sniff_ip;
 struct sniff_tcp;
@@ -48,10 +51,8 @@ struct sniff_ethernet {
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 int payload_len;
-void send_packet(const u_char *d_packet, pcap_t* handle){
-	if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
-		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
-}
+void to_send_packet(const u_char *d_packet, pcap_t* handle);
+void from_send_packet(const u_char *d_packet, pcap_t* handle);
 struct sniff_ip {
         u_char ip_vhl;
         u_char ip_tos;
@@ -101,8 +102,10 @@ struct sniff_tcp *tcp; // TCP 혜더
 char *payload; // 페이로드
 u_int size_ip;
 u_int size_tcp;
-int first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 변수
-tcp_seq dummy_seq;
+int to_first=1;// 이 패킷이 첫번째인지 아닌지 판단하는 용도의 변수
+int from_first=1;
+tcp_seq to_dummy_seq;
+tcp_seq from_dummy_seq;
 
 void parsing();
 int isfiltered();
@@ -116,15 +119,15 @@ int main(int argc, char* argv[]){
 		exit(1);
 	}
 	strcpy(toip,argv[1]);
+	inet_aton(toip,&to_struct_ip);
 	pthread_mutex_init(&mutx, NULL);
 	memset(&my_adr,0,sizeof(my_adr));
 	my_adr.sin_family=AF_INET;
 	my_adr.sin_addr.s_addr=htonl(INADDR_ANY);
 	my_adr.sin_port=htons(atoi(argv[2]));
 	pthread_create(&t_id, NULL, from_handle,NULL);
-	pthread_detach(t_id);
 	pthread_create(&t_id2,NULL,to_handle,NULL);
-	pthread_detach(t_id2);
+	getchar();
 	return 0;
 }
 void parsing(){
@@ -135,12 +138,12 @@ void parsing(){
 	tcp=(struct sniff_tcp*)(packet+SIZE_ETHERNET+size_ip);
 	size_tcp=TH_OFF(tcp)*4;
 	payload=(u_char*)(packet+SIZE_ETHERNET+size_ip+size_tcp);
+        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
+
 }
 
 void showpayload(){
 	int i;
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         if(payload_len == 0);
         else {
                 printf("< 페이로드 데이터 >\n");
@@ -182,6 +185,7 @@ int isfiltered(){
 
 void* to_handle(){
 	//pack&send
+	printf("hello\n");
 	dev = pcap_lookupdev(errbuf);
         if (dev == NULL) {
                 printf("네트워크 장치를 찾을 수 없습니다.\n");
@@ -210,11 +214,16 @@ void* to_handle(){
 	printf("패킷을 감지합니다.\n");
 	while(pcap_next_ex(handle, &header, &packet) == 1) {
 		parsing();
-		if(strcmp(toip,inet_ntoa(ip->ip_src))==0){
+		isfiltered();
+		if(strcmp(myip,inet_ntoa(ip->ip_dst))==0){
 			if(isfiltered()==1);
 			else{
+				printf("packing....\n");
+				pack();
 				printf("sending packet to target....\n");
-				send_packet(packet,handle);
+				to_send_packet(dummy_packet,handle);
+				printf("process completed!\n");
+				free(dummy_packet);
 			}
 		}
 	}	
@@ -224,10 +233,29 @@ void* from_handle(){
 	//unpack&send
 }
 void pack(){
-	u_short header_size=htons(size_ip+size_tcp+SIZE_ETHERNET+ntohs(ip->ip_len));
-        memcpy(&(ip->ip_len),&header_size,sizeof(header_size));  //update ip_total_len as pckt size+fake header size
-
+	if(to_first==1){
+		to_dummy_seq=ntohl(tcp->th_seq);//이 패킷이 첫번째일때(first==1)만 dummy_seq변수에 첫 패킷의 seq을 저장
+		to_first++;
+	}
+	memcpy(&packet[38],&to_dummy_seq,sizeof(to_dummy_seq));
+	memcpy(&(ip->ip_dst),&to_struct_ip,sizeof(to_struct_ip)); //update ip_dst as target ip
+	to_header_size=htons(132+payload_len);
+        printf("%d %d\n", ntohs(to_header_size), payload_len);
+	memcpy(&(ip->ip_len),&to_header_size,sizeof(to_header_size));  //update ip_total_len as pckt size+fake header size
+	dummy_packet=(const u_char*)malloc(sizeof(const u_char)*htons(to_header_size));
+	memset(dummy_packet,0,sizeof(const u_char)*htons(to_header_size));
+	memcpy(dummy_packet,packet,sizeof(packet)*66);
+	memcpy(dummy_packet+66,packet,sizeof(packet)*(66+payload_len));
 }
 void unpack(){
 
 }
+void to_send_packet(const u_char *d_packet, pcap_t* handle){
+        if(pcap_sendpacket(handle, d_packet, htons(to_header_size)-1) != 0)
+                fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
+}
+void from_send_packet(const u_char *d_packet, pcap_t* handle){
+        if(pcap_sendpacket(handle, d_packet, 66+payload_len) != 0)
+                fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
+}
+
