@@ -37,7 +37,8 @@ bpf_u_int32 mask; // 서브넷 마스크
 bpf_u_int32 net; // 아이피 주소
 struct pcap_pkthdr *header; // 패킷 관련 정보
 const u_char *packet; // 실제 패킷
-const u_char *dummy_packet;
+u_char *dummy_packet;
+u_char *dummy_packet2;
 struct in_addr addr; // 주소 정보
 u_int32_t target_ip;
 u_int32_t m_ip;
@@ -275,9 +276,9 @@ void* from_handle(){
                                 printf("unpacking....\n");
                                 unpack();
                                 printf("sending packet to target....\n");
-                                from_send_packet(dummy_packet,handle);
+                                from_send_packet(dummy_packet2,handle);
                                 printf("process completed!\n");
-                                free(dummy_packet);
+                                free(dummy_packet2);
                         }
                 }
         }
@@ -294,7 +295,7 @@ void pack(){
 	to_header_size=htons(132+payload_len);
         printf("%d %d\n", ntohs(to_header_size), payload_len);
 	memcpy(&(ip->ip_len),&to_header_size,sizeof(to_header_size));  //update ip_total_len as pckt size+fake header size
-	dummy_packet=(const u_char*)malloc(sizeof(const u_char)*htons(to_header_size));
+	dummy_packet=(u_char*)malloc(sizeof(u_char)*htons(to_header_size));
 	memset(dummy_packet,0,sizeof(const u_char)*htons(to_header_size));
 	memcpy(dummy_packet,packet,sizeof(packet)*66);
 	memcpy(dummy_packet+66,packet,sizeof(packet)*(66+payload_len));
@@ -310,9 +311,9 @@ void unpack(){
 	memcpy(&(ip->ip_len)+66,&from_header_size,sizeof(from_header_size)); 
 	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
 
-	dummy_packet=(const u_char*)malloc(sizeof(const u_char)*htons(from_header_size));
-	memset(dummy_packet,0,sizeof(const u_char)*htons(from_header_size));
-	memcpy(dummy_packet,packet+66,sizeof(packet)*(66+payload_len));
+	dummy_packet2=(u_char*)malloc(sizeof(u_char)*htons(from_header_size));
+	memset(dummy_packet2,0,sizeof(u_char)*htons(from_header_size));
+	memcpy(dummy_packet2,packet+66,sizeof(packet)*(66+payload_len));
 }
 void to_send_packet(const u_char *d_packet, pcap_t* handle){
         if(pcap_sendpacket(handle, d_packet, htons(to_header_size)-1) != 0)
