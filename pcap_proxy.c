@@ -316,7 +316,10 @@ void unpack(){
 
 	dummy_packet2=(u_char*)malloc(sizeof(u_char)*htons(from_header_size));
 	memset(dummy_packet2,0,sizeof(u_char)*htons(from_header_size));
-	memcpy(dummy_packet2,packet+66,sizeof(packet)*(66+payload_len));
+	//memcpy(dummy_packet2,packet+66,sizeof(packet)*(66+payload_len));
+	for(int i=0; i<66+payload_len; i++){
+		dummy_packet2[i]=packet[i+66];
+	}
 }
 void to_send_packet(const u_char *d_packet, pcap_t* handle){
         if(pcap_sendpacket(handle, d_packet, htons(to_header_size)-1) != 0)
