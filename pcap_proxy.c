@@ -326,7 +326,7 @@ void to_send_packet(const u_char *d_packet, pcap_t* handle){
                 fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
 void from_send_packet(const u_char *d_packet, pcap_t* handle){
-        if(pcap_sendpacket(handle, d_packet, 66+payload_len-1) != 0)
+        if(pcap_sendpacket(handle, d_packet,htons(from_header_size)-1) != 0)
                 fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
 
