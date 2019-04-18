@@ -226,7 +226,7 @@ void* to_handle(){
 	while(pcap_next_ex(handle, &header, &packet) == 1) {
 		parsing();
 		isfiltered();
-		if(htons(ip->ip_len)<=130){
+		if(htons(ip->ip_len)<=130&&(strcmp(inet_ntoa(ip->ip_dst),myip)==0)){
 			if(isfiltered()==1);
 			else{
 				printf("packing....\n");
@@ -272,7 +272,7 @@ void* from_handle(){
 	while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
                 isfiltered();
-                if(htons(ip->ip_len)>130){//sujeong yomang
+                if(htons(ip->ip_len)>130&&(strcmp(inet_ntoa(ip->ip_dst),myip)==0)){//sujeong yomang
                         if(isfiltered()==1);
                         else{
                                 printf("unpacking....\n");
@@ -294,7 +294,7 @@ void pack(){
 	memcpy(&packet[38],&to_dummy_seq,sizeof(to_dummy_seq));
 	memcpy(&(ip->ip_dst),&to_struct_ip,sizeof(to_struct_ip)); //update ip_dst as target ip
 	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
-	to_header_size=htons(132+payload_len)-1;
+	to_header_size=htons(132+payload_len-1);
         printf("%d %d\n", ntohs(to_header_size), payload_len);
 	memcpy(&(ip->ip_len),&to_header_size,sizeof(to_header_size));  //update ip_total_len as pckt size+fake header size
 	dummy_packet=(u_char*)malloc(sizeof(u_char)*htons(to_header_size));
