@@ -133,9 +133,9 @@ int main(int argc, char* argv[]){
 	my_adr.sin_addr.s_addr=htonl(INADDR_ANY);
 	my_adr.sin_port=htons(atoi(argv[3]));
 	pthread_create(&t_id, NULL, from_handle,NULL);
-	pthread_detach(t_id);
+
 	pthread_create(&t_id2,NULL,to_handle,NULL);
-	pthread_detach(t_id2);
+	
 	getchar();
 	return 0;
 }
@@ -272,6 +272,7 @@ void* from_handle(){
 	while(pcap_next_ex(handle, &header, &packet) == 1) {
                 parsing();
                 isfiltered();
+		printf("%s      %s\n", inet_ntoa(ip->ip_dst),myip);
                 if(htons(ip->ip_len)>130&&(strcmp(inet_ntoa(ip->ip_dst),myip)==0)){//sujeong yomang
                         if(isfiltered()==1);
                         else{
@@ -311,7 +312,7 @@ void unpack(){
 	memcpy(&packet[38]+66,&from_dummy_seq,sizeof(from_dummy_seq));
         memcpy(&(ip->ip_dst)+66,&from_struct_ip,sizeof(from_struct_ip)); //update ip_dst as target ip
 	memcpy(&(ip->ip_len)+66,&from_header_size,sizeof(from_header_size)); 
-	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
+	memcpy(&(ip->ip_src)+66,&my_struct_ip,sizeof(my_struct_ip));
 
 	dummy_packet2=(u_char*)malloc(sizeof(u_char)*htons(from_header_size));
 	memset(dummy_packet2,0,sizeof(u_char)*htons(from_header_size));
