@@ -133,7 +133,9 @@ int main(int argc, char* argv[]){
 	my_adr.sin_addr.s_addr=htonl(INADDR_ANY);
 	my_adr.sin_port=htons(atoi(argv[3]));
 	pthread_create(&t_id, NULL, from_handle,NULL);
+	pthread_detach(t_id);
 	pthread_create(&t_id2,NULL,to_handle,NULL);
+	pthread_detach(t_id2);
 	getchar();
 	return 0;
 }
@@ -292,7 +294,7 @@ void pack(){
 	memcpy(&packet[38],&to_dummy_seq,sizeof(to_dummy_seq));
 	memcpy(&(ip->ip_dst),&to_struct_ip,sizeof(to_struct_ip)); //update ip_dst as target ip
 	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
-	to_header_size=htons(132+payload_len);
+	to_header_size=htons(132+payload_len)-1;
         printf("%d %d\n", ntohs(to_header_size), payload_len);
 	memcpy(&(ip->ip_len),&to_header_size,sizeof(to_header_size));  //update ip_total_len as pckt size+fake header size
 	dummy_packet=(u_char*)malloc(sizeof(u_char)*htons(to_header_size));
