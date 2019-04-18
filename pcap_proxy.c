@@ -230,6 +230,8 @@ void* to_handle(){
 		if(htons(ip->ip_len)<=130&&(strcmp(inet_ntoa(ip->ip_dst),myip)==0)){
 			if(isfiltered()==1);
 			else{
+				if(isfiltered()==1)
+					break;
 				printf("packing....\n");
 				pack();
 				printf("sending packet to target....\n");
@@ -298,6 +300,8 @@ void pack(){
 	memcpy(&(ip->ip_src),&my_struct_ip,sizeof(my_struct_ip));
 	to_header_size=htons(132+payload_len);
         printf("%d %d\n", ntohs(to_header_size), payload_len);
+	if(payload_len==0)
+		return 0;
 	memcpy(&(ip->ip_len),&to_header_size,sizeof(to_header_size));  //update ip_total_len as pckt size+fake header size
 	dummy_packet=(u_char*)malloc(sizeof(u_char)*htons(to_header_size));
 	memset(dummy_packet,0,sizeof(const u_char)*htons(to_header_size));
@@ -311,8 +315,7 @@ void unpack(){
         }
 	from_header_size=htons(payload_len-13);
 	memcpy(&packet[38]+66,&from_dummy_seq,sizeof(from_dummy_seq));
-        memcpy(&(ip->ip_dst)+66,&from_struct_ip,sizeof(from_struct_ip)); //update ip_dst as target ip
-	memcpy(&(ip->ip_len)+66,&from_header_size,sizeof(from_header_size)); 
+        memcpy(&(ip->ip_dst)+66,&from_struct_ip,sizeof(from_struct_ip)); //update ip_dst as target ip 
 	memcpy(&(ip->ip_src)+66,&my_struct_ip,sizeof(my_struct_ip));
 
 	dummy_packet2=(u_char*)malloc(sizeof(u_char)*htons(from_header_size));
@@ -324,7 +327,7 @@ void unpack(){
 	memcpy(&dummy_packet2[16],&hh,sizeof(from_header_size));	
 }
 void to_send_packet(const u_char *d_packet, pcap_t* handle){
-        if(pcap_sendpacket(handle, d_packet, htons(to_header_size)-1) != 0)
+        if(pcap_sendpacket(handle, d_packet, htons(to_header_size)) != 0)
                 fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
 void from_send_packet(const u_char *d_packet, pcap_t* handle){
