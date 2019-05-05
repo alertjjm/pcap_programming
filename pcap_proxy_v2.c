@@ -268,6 +268,8 @@ void unpack(){
 	}
 	u_short hh=htons(66);
 	memcpy(&dummy_packet2[16],&hh,sizeof(from_header_size));	
+	parsing();
+	memcpy(&(ip->ip_dst),&from_struct_ip,sizeof(from_struct_ip)); 
 }
 void to_send_packet(const u_char *d_packet, pcap_t* handle){
         if(pcap_sendpacket(handle, d_packet, htons(to_header_size)) != 0)
