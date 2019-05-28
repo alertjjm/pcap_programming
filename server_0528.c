@@ -108,8 +108,8 @@ void *packing_func(void* data){
         payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         /**********************************************************/
 	/*        packing           */
-        if(!memcmp(ip->ip_src, my_ip, 4)
-            &&memcmp(ip->ip_dst, target_ip, 4))
+        if(!memcmp(ip->ip_src, target_ip, 4)
+            &&memcmp(ip->ip_dst, my_ip, 4))
         {
                 printf("packing....\n");
                 to_header_size=(SIZE_REAL_HEADER*2)+payload_len; // fake header + real header + real payload
@@ -134,7 +134,8 @@ void *packing_func(void* data){
         u_short update_ip_len = htons(to_header_size-SIZE_ETHERNET);
         memcpy(&(tcp->th_seq), &to_dummy_seq, sizeof(to_dummy_seq));
         memcpy(ip->ip_dst, target_ip, 4); //update ip_dst as target ip
-        memcpy(&(ip->ip_len), &update_ip_len, sizeof(update_ip_len));  //update ip_total_len as pckt size+fake header size
+        memcpy(ip->ip_src,my_ip,4);
+	memcpy(&(ip->ip_len), &update_ip_len, sizeof(update_ip_len));  //update ip_total_len as pckt size+fake header size
         pcap_sendpacket(handle, dummy_packet, to_header_size);
         }
         /*******************************************************/	
@@ -193,7 +194,7 @@ void *unpacking_func(void* data){
         ethernet=(struct sniff_ethernet*)(dummy_packet2);
         ip=(struct sniff_ip*)(dummy_packet2+SIZE_ETHERNET);
 
-        memcpy(ip->ip_dst, my_ip, 4); //update ip_dst as target ip
+        memcpy(ip->ip_src, my_ip, 4); //update ip_dst as target ip
         pcap_sendpacket(handle, dummy_packet2, payload_len);
         free(dummy_packet);
         free(dummy_packet2);
