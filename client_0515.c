@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
 	pthread_t p1;
 	pthread_t p2;
 	int thrid1,thrid2;
-
+	int status;
 	if(argc!=3)
         {
 		printf("Usage : %s <interface> <target ip>\n",argv[0]);
@@ -62,8 +62,10 @@ int main(int argc, char* argv[])
 
         thrid1=pthread_create(&p1,NULL,packing_func,argv);
 	thrid2=pthread_create(&p2,NULL,unpacking_func,argv);
-      
-      
+	pthread_join(p1, (void **)&status);
+   	pthread_join(p2, (void **)&status);
+
+
 	return 0;
 }
 void *packing_func(void* data){
